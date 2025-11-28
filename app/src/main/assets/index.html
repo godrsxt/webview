@@ -3,9 +3,595 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Mobile Quiz Game</title>
+    <style>
+        /* CSS: Replicating Pygame Layout and Colors */
+        :root {
+            /* Pygame Colors */
+            --white: rgb(255, 255, 255);
+            --black: rgb(0, 0, 0);
+            --green: rgb(0, 200, 0);
+            --red: rgb(200, 0, 0);
+            --cyan-border: rgb(0, 255, 255);
+            --light-grey: rgb(200, 200, 200);
+
+            /* Configuration */
+            --screen-width: 400px;
+            --screen-height: 700px;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        /* The main game container (simulating the Pygame window size) */
+        #game-container {
+            width: var(--screen-width);
+            height: var(--screen-height);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+            background-color: var(--white); /* Default white screen if no image */
+            display: flex;
+            flex-direction: column;
+            position: relative; /* For background image and absolute positioning */
+            overflow: hidden;
+            
+            /* Add background image support (Requirement 3) */
+            /* Note: Replace 'background.jpg' with a real path if you use one */
+            background-image: url('background.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+        
+        /* Question Box (Requirement 1 & Layout) */
+        #question-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: calc(100% - 40px);
+            height: 55%; /* ~385px of 700px */
+            background-color: var(--white);
+            border: 5px solid var(--cyan-border);
+            border-radius: 10px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            text-align: center;
+            font-size: 24px; /* FONT_LARGE ~40 */
+            font-weight: bold;
+            color: var(--black);
+        }
+
+        /* Option Buttons Container */
+        #options-container {
+            position: absolute;
+            top: calc(55% + 30px); /* 55% height + 20px gap + 10px margin */
+            left: 20px;
+            width: calc(100% - 40px);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 20px;
+        }
+
+        /* Option Button (Requirement 2) */
+        .option-button {
+            height: 90px;
+            background-color: var(--white);
+            border: 3px solid var(--black);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            text-align: center;
+            padding: 5px;
+            font-size: 18px; /* FONT_MEDIUM ~28 */
+            transition: background-color 0.1s;
+        }
+
+        .option-button:hover:not(.disabled) {
+            background-color: #f5f5f5;
+        }
+        
+        .option-button.disabled {
+            cursor: default;
+        }
+
+        /* Feedback Area */
+        #feedback-area {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            font-size: 30px; /* FONT_LARGE ~40 */
+            font-weight: bold;
+        }
+        
+        /* State Styles */
+        .correct-answer {
+            color: var(--green) !important;
+            border-color: var(--green) !important;
+        }
+        
+        .incorrect-fade {
+            background-color: var(--light-grey) !important;
+            color: var(--black); /* Keep text readable */
+        }
+
+        /* Quiz Complete Screen */
+        #complete-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--white);
+            display: none; /* Hidden until quiz ends */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        #complete-screen h2 {
+            font-size: 40px; /* Bigger font for main message */
+            color: var(--green);
+            margin-bottom: 10px;
+        }
+        
+        #complete-screen p {
+            font-size: 20px;
+            color: var(--black);
+        }
+
+    </style>
 </head>
-<body style="font-family: monospace">
-    REPLACE THIS FILE WITH YOUR OWN INDEX.HTML
+<body>
+
+    <div id="game-container">
+        <div id="question-box"></div>
+        
+        <div id="options-container">
+            </div>
+        
+        <div id="feedback-area"></div>
+        
+        <div id="complete-screen">
+            <h2>🏆 QUIZ COMPLETE!</h2>
+            <p>Thank you for playing!</p>
+        </div>
+        
+    </div>
+
+    <script>
+        // JavaScript: Game Logic
+
+        // --- Configuration ---
+        const DELAY_TIME = 1600; // 1600ms (1.6 seconds) delay (Requirement 2)
+        
+        // --- Quiz Data (Requirement 5) ---
+        const QUIZ_DATA = [
+            {
+                "question": "The extremely long question asks: What famous historical event occurred in 1912, involving a massive ship that struck an iceberg in the North Atlantic Ocean?",
+                "options": ["The launch of the USS Enterprise", "The sinking of the RMS Titanic after hitting an iceberg", "The opening of the Panama Canal", "The start of the First World War in Europe"],
+                "correct_answer": "The sinking of the RMS Titanic after hitting an iceberg"
+            },
+            {
+                "question": "Which gas makes up most of Earth's atmosphere?",
+                "options": ["Oxygen", "Carbon Dioxide", "Argon", "Nitrogen"],
+                "correct_answer": "Nitrogen"
+            }, 
+            {
+                "question": "What is the smallest planet in our solar system?",
+                "options": ["Earth", "Mars", "Mercury", "Venus"],
+                "correct_answer": "Mercury"
+            }, 
+            {
+                "question": "What famous historical event occurred in 1912, involving a massive ship that struck an iceberg in the North Atlantic Ocean?",
+                "options": ["The launch of the USS Enterprise", "The sinking of the RMS Titanic after hitting an iceberg", "The opening of the Panama Canal", "The start of the First World War in Europe"],
+                "correct_answer": "The sinking of the RMS Titanic after hitting an iceberg"
+            },
+            {
+                "question": "  who are you ",
+                "options": [" rush ", " god ", " xy ", " op "],
+                "correct_answer": " god "
+            }, 
+            {
+                "question": "who you are",
+                "options": ["god", "devil", "evil", "gaint"],
+                "correct_answer": "god"
+            },
+            {
+                "question": "how you are",
+                "options": ["good", "happy", "bad", "sad"],
+                "correct_answer": "happy"
+            },
+            {
+                "question": "where you are",
+                "options": ["", "earth", "sun ", "mars"],
+                "correct_answer": "earth"
+            }, 
+            {
+                "question": "A for",
+                "options": ["apple", "banana", "orange", "lemon"],
+                "correct_answer": "apple"
+            },
+            {
+                "question": "B for ______",
+                "options": ["grapes", "cucumber", "ginger", "banana"],
+                "correct_answer": "banana"
+            }, 
+            {
+                "question": "C for ____",
+                "options": ["door", "bell", "cat", "dog"],
+                "correct_answer": "cat"
+            },
+            {
+                "question": "d for ___",
+                "options": ["door", "cat", "chess", "bell"],
+                "correct_answer": "door"
+            },
+            {
+                "question": "which is country",
+                "options": ["gold", "silver", "india", "door"],
+                "correct_answer": "india"
+            },
+            {
+                "question": "z for _____",
+                "options": ["yak", "bell", "goa", "zebra"],
+                "correct_answer": "zebra"
+            },
+            {
+                "question": "k for _____",
+                "options": ["king", "goal", "queen", "window"],
+                "correct_answer": "king"
+            }
+ 
+
+
+           {
+        "question": "The hepatic portal vein carries blood from the intestine to the liver before it is delivered to the systemic circulation. This is primarily to:",
+        "options": [
+            "(a) Distribute absorbed lipids to the liver.",
+            "(b) Store excess glucose as glycogen in the pancreas.",
+            "(c) Detoxify and process absorbed nutrients before they reach the rest of the body.",
+            "(d) Transport excretory products from the intestine to the kidney."
+        ],
+        "correct_answer": "(c) Detoxify and process absorbed nutrients before they reach the rest of            },
+        {
+        "question": "Under normal physiological conditions, every $100 \\text{ mL}$ of deoxygenated blood delivers approximately:",
+        "options": [
+            "(a) $5 \\text{ mL}$ of $\\text{O}_2$ to the tissues.",
+            "(b) $5 \\text{ mL}$ of $\\text{CO}_2$ to the alveoli.",
+            "(c) $4 \\text{ mL}$ of $\\text{O}_2$ to the tissues.",
+            "(d) $4 \\text{ mL}$ of $\\text{CO}_2$ to the alveoli."
+        ],
+        "correct_answer": "(d) $4 \\text{ mL}$ of $\\text{CO}_2$ to the alveoli."
+    },
+    {
+        "question": "Which of the following components of the blood is responsible for initiating the process of blood coagulation or clotting?",
+        "options": [
+            "(a) Erythrocytes",
+            "(b) Lymphocytes",
+            "(c) Platelets (Thrombocytes)",
+            "(d) Plasma proteins like Albumin"
+        ],
+        "correct_answer": "(c) Platelets (Thrombocytes)"
+    },
+    {
+        "question": "The highly coiled part of the nephron that is primarily involved in the reabsorption of all essential nutrients and $70-80\\%$ of electrolytes and water is the:",
+        "options": [
+            "(a) Loop of Henle.",
+            "(b) Distal Convoluted Tubule (DCT).",
+            "(c) Collecting Duct.",
+            "(d) Proximal Convoluted Tubule (PCT)."
+        ],
+        "correct_answer": "(d) Proximal Convoluted Tubule (PCT)."
+    },
+    {
+        "question": "The globular head of the myosin filament acts as an ATPase enzyme. The energy released by the hydrolysis of ATP is used to:",
+        "options": [
+            "(a) Form the Z-line.",
+            "(b) Pull the actin filament towards the M-line.",
+            "(c) Stabilize the Sarcomere.",
+            "(d) Open the sarcoplasmic reticulum for $\\text{Ca}^{2+}$ release."
+        ],
+        "correct_answer": "(b) Pull the actin filament towards the M-line."
+    },
+    {
+        "question": "The primary function of the cerebellum is:",
+        "options": [
+            "(a) Regulating body temperature and hunger.",
+            "(b) Relay center for sensory and motor signals.",
+            "(c) Controlling voluntary actions like memory and communication.",
+            "(d) Maintaining body posture, equilibrium, and precision of voluntary movements."
+        ],
+        "correct_answer": "(d) Maintaining body posture, equilibrium, and precision of voluntary movements."
+    },
+    {
+        "question": "The hormone that plays a major role in the regulation of the diurnal rhythm (sleep-wake cycle) and is secreted by the Pineal Gland is:",
+        "options": [
+            "(a) Oxytocin",
+            "(b) Thyroxine",
+            "(c) Melatonin",
+            "(d) Adrenaline"
+        ],
+        "correct_answer": "(c) Melatonin"
+    },
+    {
+        "question": "The substance that emulsifies fats in the small intestine, facilitating the action of lipases, is:",
+        "options": [
+            "(a) $\\text{HCl}$",
+            "(b) Trypsinogen",
+            "(c) Pepsin",
+            "(d) Bile salts"
+        ],
+        "correct_answer": "(d) Bile salts"
+    },
+    {
+        "question": "The highest partial pressure of $\\text{O}_2 (\\text{p}\\text{O}_2)$ is found in the:",
+        "options": [
+            "(a) Tissues",
+            "(b) Deoxygenated blood",
+            "(c) Atmospheric air",
+            "(d) Alveoli"
+        ],
+        "correct_answer": "(c) Atmospheric air"
+    },
+    {
+        "question": "The pacemaker of the heart, which generates the action potential, is the:",
+        "options": [
+            "(a) Atrio-ventricular node (AVN)",
+            "(b) Bundle of His",
+            "(c) Purkinje fibers",
+            "(d) Sino-atrial node (SAN)"
+        ],
+        "correct_answer": "(d) Sino-atrial node (SAN)"
+    },
+    {
+        "question": "Ureotelic animals excrete nitrogenous waste primarily in the form of urea. Which of the following is an example of a ureotelic organism?",
+        "options": [
+            "(a) Birds",
+            "(b) Aquatic Insects",
+            "(c) Mammals",
+            "(d) Bony fishes"
+        ],
+        "correct_answer": "(c) Mammals"
+    },
+    {
+        "question": "The central part of the thick filament (myosin) that is not overlapped by thin filaments (actin) in a resting muscle fiber is called the:",
+        "options": [
+            "(a) I-band",
+            "(b) H-zone",
+            "(c) Z-line",
+            "(d) A-band"
+        ],
+        "correct_answer": "(b) H-zone"
+    },
+    {
+        "question": "The structure that separates the outer ear from the middle ear and vibrates in response to sound waves is the:",
+        "options": [
+            "(a) Cochlea",
+            "(b) Eustachian tube",
+            "(c) Tympanic membrane (Ear drum)",
+            "(d) Oval window"
+        ],
+        "correct_answer": "(c) Tympanic membrane (Ear drum)"
+    },
+    {
+        "question": "The hormone responsible for the milk ejection reflex (release of milk) from the mammary glands is:",
+        "options": [
+            "(a) Prolactin",
+            "(b) Vasopressin (ADH)",
+            "(c) $\\text{TSH}$ (Thyroid Stimulating Hormone)",
+            "(d) Oxytocin"
+        ],
+        "correct_answer": "(d) Oxytocin"
+    },
+    {
+        "question": "$\\text{Oxyntic}$ or Parietal cells in the gastric glands secrete:",
+        "options": [
+            "(a) Pepsinogen and Mucus",
+            "(b) Lipase and Rennin",
+            "(c) $\\text{HCl}$ and Intrinsic Factor",
+            "(d) Gastrin"
+        ],
+        "correct_answer": "(c) $\\text{HCl}$ and Intrinsic Factor"
+    },
+    {
+        "question": "The volume of air inspired or expired during a normal respiration is called the:",
+        "options": [
+            "(a) Inspiratory Reserve Volume (IRV)",
+            "(b) Functional Residual Capacity (FRC)",
+            "(c) Tidal Volume (TV)",
+            "(d) Residual Volume (RV)"
+        ],
+        "correct_answer": "(c) Tidal Volume (TV)"
+    },
+    {
+        "question": "During a normal cardiac cycle, the $\\text{systole}$ (contraction) of the ventricles lasts for approximately:",
+        "options": [
+            "(a) $0.4 \\text{ seconds}$",
+            "(b) $0.5 \\text{ seconds}$",
+            "(c) $0.1 \\text{ seconds}$",
+            "(d) $0.3 \\text{ seconds}$"
+        ],
+        "correct_answer": "(d) $0.3 \\text{ seconds}$"
+    },
+    {
+        "question": "The counter-current mechanism that helps to maintain a concentration gradient in the renal medulla is established primarily by the Loop of Henle and the:",
+        "options": [
+            "(a) $\\text{PCT}$",
+            "(b) Glomerulus",
+            "(c) $\\text{DCT}$",
+            "(d) Vasa Recta"
+        ],
+        "correct_answer": "(d) Vasa Recta"
+    },
+    {
+        "question": "The joint between the Atlas (first vertebra) and the Axis (second vertebra) is an example of a:",
+        "options": [
+            "(a) Gliding joint",
+            "(b) Pivot joint",
+            "(c) Hinge joint",
+            "(d) Ball and socket joint"
+        ],
+        "correct_answer": "(b) Pivot joint"
+    },
+    {
+        "question": "Which of the following hormones is secreted by the Adrenal Medulla and is known as the 'emergency hormone'?",
+        "options": [
+            "(a) Cortisol",
+            "(b) Aldosterone",
+            "(c) $\\text{FSH}$ (Follicle Stimulating Hormone)\",",
+            "(d) Adrenaline (Epinephrine)\""
+        ],
+        "correct_answer": "(d) Adrenaline"
+    }
+
+
+
+
+
+
+
+
+
+
+        ];
+
+        // --- Game State ---
+        let currentQIndex = 0;
+        let buttonsEnabled = true;
+        
+        // --- DOM Elements ---
+        const questionBox = document.getElementById('question-box');
+        const optionsContainer = document.getElementById('options-container');
+        const feedbackArea = document.getElementById('feedback-area');
+        const completeScreen = document.getElementById('complete-screen');
+        const gameContainer = document.getElementById('game-container');
+
+
+        // --- Core Functions ---
+
+        /**
+         * Renders the current question and options.
+         */
+        function drawQuizScreen() {
+            if (currentQIndex >= QUIZ_DATA.length) {
+                showCompletionScreen();
+                return;
+            }
+
+            const currentQuiz = QUIZ_DATA[currentQIndex];
+            
+            // 1. Draw Question (HTML handles the automatic word-wrapping/layout)
+            questionBox.textContent = currentQuiz.question;
+
+            // 2. Draw Options
+            optionsContainer.innerHTML = ''; // Clear previous options
+            currentQuiz.options.forEach((option, index) => {
+                const button = document.createElement('div');
+                button.classList.add('option-button');
+                button.textContent = option;
+                button.dataset.index = index; // Store the index
+                
+                // Attach event listener for click (Requirement 2)
+                button.addEventListener('click', () => checkAnswer(option, button));
+                
+                optionsContainer.appendChild(button);
+            });
+            
+            // 3. Reset Feedback
+            feedbackArea.textContent = "";
+            buttonsEnabled = true;
+            enableButtons();
+        }
+
+        /**
+         * Enables or disables all option buttons.
+         */
+        function enableButtons(enabled = true) {
+            document.querySelectorAll('.option-button').forEach(btn => {
+                btn.classList.toggle('disabled', !enabled);
+                btn.style.pointerEvents = enabled ? 'auto' : 'none';
+                btn.classList.remove('correct-answer', 'incorrect-fade');
+                btn.style.backgroundColor = 'var(--white)';
+            });
+        }
+
+        /**
+         * Checks the selected answer and initiates the delay/feedback.
+         * @param {string} selectedOption - The text of the selected option.
+         * @param {HTMLElement} selectedButton - The button element that was clicked.
+         */
+        function checkAnswer(selectedOption, selectedButton) {
+            if (!buttonsEnabled) return;
+
+            buttonsEnabled = false;
+            const currentQuiz = QUIZ_DATA[currentQIndex];
+            
+            if (selectedOption === currentQuiz.correct_answer) {
+                // Correct Answer Logic
+                feedbackArea.textContent = "CORRECT!";
+                feedbackArea.style.color = "var(--green)";
+                
+                // Highlight the correct button
+                selectedButton.classList.add('correct-answer');
+
+                // Initiate the delay before moving on
+                setTimeout(goToNextQuestion, DELAY_TIME);
+                
+            } else {
+                // Incorrect Answer Logic
+                feedbackArea.textContent = "Incorrect. Try again.";
+                feedbackArea.style.color = "var(--red)";
+                
+                // Temporarily disable the incorrect button and fade it out
+                selectedButton.classList.add('incorrect-fade');
+                selectedButton.style.pointerEvents = 'none';
+
+                // Re-enable remaining buttons for the next attempt
+                buttonsEnabled = true;
+            }
+        }
+
+        /**
+         * Moves to the next question in the sequence.
+         */
+        function goToNextQuestion() {
+            currentQIndex++;
+            drawQuizScreen();
+        }
+
+        /**
+         * Displays the Quiz Complete screen.
+         */
+        function showCompletionScreen() {
+            // Hide the game elements
+            questionBox.style.display = 'none';
+            optionsContainer.style.display = 'none';
+            feedbackArea.style.display = 'none';
+            
+            // Show the complete screen (The final requirement)
+            completeScreen.style.display = 'flex';
+            
+            // For the completion screen, set the background to white as in the original code
+            gameContainer.style.backgroundImage = 'none';
+            gameContainer.style.backgroundColor = 'var(--white)';
+        }
+
+        // --- Initialization ---
+        drawQuizScreen(); // Start the quiz
+        
+    </script>
+
 </body>
 </html>
